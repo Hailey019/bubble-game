@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Bubble Pop 解压小游戏</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --bg-color: #050218;
+    --accent: #ffcc4d;
+    --accent2: #7b5cff;
+    --danger: #ff4d6a;
+    --good: #4dffb8;
+    --hud-bg: rgba(10, 5, 40, 0.85);
+    --text-main: #f8ecff;
+    --text-sub: #b7a6ff;
+  }
+
+  * {
+    box-sizing: border-box;
+    user-select: none;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(circle at 20% 20%, #281c5f 0, #050218 50%, #000000 100%);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text-main);
+  }
+
+  body {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+  }
+
+  .game-root {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  canvas#gameCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .starfield {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 10% 20%, rgba(255,255,255,0.12) 0, transparent 50%),
+      radial-gradient(circle at 80% 10%, rgba(160,130,255,0.25) 0, transparent 60%),
+      radial-gradient(circle at 5% 80%, rgba(90,190,255,0.18) 0, transparent 55%);
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+
+  .hud {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 20% 0%, rgba(148,115,255,0.45), rgba(13,6,40,0.95));
+    box-shadow:
+      0 0 25px rgba(80,40,140,0.8),
+      0 0 60px rgba(0,0,0,0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(180,150,255,0.4);
+    z-index: 5;
+  }
+
+  .hud-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 70px;
+  }
+
+  .hud-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-sub);
+  }
+
+  .hud-value {
+    margin-top: 2px;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .hud-value.combo {
+    color: var(--good);
+    text-shadow: 0 0 10px rgba(77,255,184,0.8);
+  }
+
+  .hud-value.score {
+    color: var(--accent);
+    text-shadow: 0 0 12px rgba(255,204,77,0.9);
+  }
+
+  /* 计时环 */
+  .timer-ring {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .timer-ring::before {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    background: conic-gradient(from -90deg, #ff7a7a, #ffd36f, #7dffcb, #7b5cff, #ff7a7a);
+    opacity: 0.5;
+    filter: blur(6px);
+    z-index: -1;
+  }
+
+  .timer-svg {
+    transform: rotate(-90deg);
+  }
+
+  .timer-text {
+    position: absolute;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .modes {
+    display: flex;
+    gap: 4px;
+  }
+
+  .mode-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-sub);
+    transition: all 0.15s ease-out;
+  }
+
+  .mode-btn.active {
+    background: linear-gradient(120deg, #ffcc4d, #ff9f4d);
+    color: #1a0b33;
+    box-shadow: 0 0 14px rgba(255,204,77,0.9);
+  }
+
+  .mode-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px rgba(255,255,255,0.2);
+  }
+
+  .controls {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .main-btn {
+    border-radius: 999px;
+    border: none;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: linear-gradient(135deg, #7b5cff, #a177ff);
+    color: #f8ecff;
+    box-shadow: 0 0 16px rgba(123,92,255,0.9);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  }
+
+  .main-btn:active {
+    transform: translateY(1px) scale(0.97);
+    box-shadow: 0 0 8px rgba(0,0,0,0.8);
+    filter: brightness(0.88);
+  }
+
+  .leaderboard-panel {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 210px;
+    max-width: 40vw;
+    padding: 10px 12px;
+    border-radius: 18px;
+    background: var(--hud-bg);
+    box-shadow: 0 0 24px rgba(0,0,0,0.8);
+    border: 1px solid rgba(160,130,255,0.55);
+    backdrop-filter: blur(14px);
+    z-index: 5;
+  }
+
+  .leaderboard-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    color: var(--accent);
+  }
+
+  .leaderboard-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 260px;
+    overflow: auto;
+  }
+
+  .leaderboard-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 6px;
+    font-size: 11px;
+    border-radius: 999px;
+    margin-bottom: 2px;
+  }
+
+  .leaderboard-item.me {
+    background: rgba(123,92,255,0.4);
+    box-shadow: 0 0 12px rgba(123,92,255,0.8);
+  }
+
+  .leaderboard-rank {
+    width: 20px;
+    text-align: center;
+    opacity: 0.75;
+  }
+
+  .leaderboard-name {
+    flex: 1 1 auto;
+    padding: 0 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--text-sub);
+  }
+
+  .leaderboard-score {
+    min-width: 40px;
+    text-align: right;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .bubble-legend {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--text-sub);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px 8px;
+  }
+
+  .legend-item span {
+    margin-right: 3px;
+  }
+
+  .combo-text {
+    position: absolute;
+    left: 50%;
+    top: 80px;
+    transform: translateX(-50%);
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--good);
+    text-shadow:
+      0 0 16px rgba(77,255,184,0.9),
+      0 0 28px rgba(0,0,0,0.9);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+    z-index: 6;
+  }
+
+  .combo-text.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  .combo-tier-1 {
+    color: #7dffcb;
+  }
+  .combo-tier-2 {
+    color: #fffd7d;
+  }
+  .combo-tier-3 {
+    color: #ff7da8;
+  }
+
+  @media (max-width: 820px) {
+    .hud {
+      top: 4px;
+      padding: 6px 10px;
+      gap: 10px;
+      transform: translateX(-50%) scale(0.96);
+    }
+    .leaderboard-panel {
+      display: none;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .hud-label {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+    }
+    .hud-value {
+      font-size: 15px;
+    }
+    .modes {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="game-root">
+  <canvas id="gameCanvas"></canvas>
+  <div class="starfield"></div>
+
+  <div class="hud">
+    <div class="hud-section">
+      <div class="hud-label">Score</div>
+      <div class="hud-value score" id="scoreDisplay">0</div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-label">Time</div>
+      <div class="timer-ring">
+        <svg class="timer-svg" width="46" height="46">
+          <circle cx="23" cy="23" r="18" stroke="rgba(40,20,80,0.9)" stroke-width="8" fill="none"></circle>
+          <circle id="timerCircle" cx="23" cy="23" r="18"
+                  stroke="#7dffcb" stroke-linecap="round" stroke-width="8"
+                  fill="none" stroke-dasharray="113.1" stroke-dashoffset="0"></circle>
+        </svg>
+        <div class="timer-text" id="timerText">∞</div>
+      </div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-label">Combo</div>
+      <div class="hud-value combo" id="comboDisplay">0x</div>
+    </div>
+
+    <div class="hud-section">
+      <div class="hud-label">Mode</div>
+      <div class="modes" id="modeButtons">
+        <button class="mode-btn active" data-mode="60">60s</button>
+        <button class="mode-btn" data-mode="30">30s</button>
+        <button class="mode-btn" data-mode="infinite">∞</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="main-btn" id="startBtn">开始</button>
+      <button class="main-btn" id="stopBtn" style="background:linear-gradient(135deg,#ff4d6a,#ff9f7a); box-shadow:0 0 16px rgba(255,77,106,0.8);">结束</button>
+    </div>
+  </div>
+
+  <div class="leaderboard-panel">
+    <div class="leaderboard-title">排行榜 TOP 8</div>
+    <ul class="leaderboard-list" id="leaderboardList"></ul>
+    <div class="bubble-legend">
+      <div class="legend-item"><span>●</span>普通 +1</div>
+      <div class="legend-item"><span>★</span>黄金 ×3</div>
+      <div class="legend-item"><span>💥</span>炸弹 扣分+清屏</div>
+      <div class="legend-item"><span>⚡</span>连击 +3连击</div>
+      <div class="legend-item"><span>◐</span>隐身 ×2</div>
+      <div class="legend-item"><span>❄</span>冰冻 停止生成</div>
+    </div>
+  </div>
+
+  <div id="comboBanner" class="combo-text"></div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let width = window.innerWidth;
+  let height = window.innerHeight;
+  canvas.width = width * window.devicePixelRatio;
+  canvas.height = height * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+  window.addEventListener('resize', () => {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  });
+
+  const scoreDisplay = document.getElementById('scoreDisplay');
+  const timerText = document.getElementById('timerText');
+  const timerCircle = document.getElementById('timerCircle');
+  const comboDisplay = document.getElementById('comboDisplay');
+  const modeButtons = document.getElementById('modeButtons');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const leaderboardList = document.getElementById('leaderboardList');
+  const comboBanner = document.getElementById('comboBanner');
+
+  const TWO_PI = Math.PI * 2;
+
+  const BUBBLE_TYPES = {
+    NORMAL: 'normal',
+    GOLD: 'gold',
+    BOMB: 'bomb',
+    COMBO: 'combo',
+    INVISIBLE: 'invisible',
+    ICE: 'ice'
+  };
+
+  let bubbles = [];
+  let particles = [];
+  let score = 0;
+  let combo = 0;
+  let lastHitTime = 0;
+  const COMBO_WINDOW = 1500; // ms
+  let gameRunning = false;
+  let mode = '60'; // "60", "30", "infinite"
+  let timeLeft = 60;
+  let totalTime = 60;
+  let lastFrame = performance.now();
+  let spawnAccumulator = 0;
+  let spawnIntervalBase = 550; // ms
+  let bubbleIdCounter = 1;
+  let generationPausedUntil = 0;
+
+  // Web Audio（仅用于点击音效）
+  let audioCtx = null;
+  let masterGain = null;
+  const comboMilestones = [5, 10, 20];
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      audioCtx = new AC();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = 0.24;
+      masterGain.connect(audioCtx.destination);
+    }
+  }
+
+  function playTone({ type = 'sine', freq = 440, duration = 0.15, gain = 0.4, attack = 0.01, decay = 0.08 }) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.connect(g);
+    g.connect(masterGain);
+
+    const now = audioCtx.currentTime;
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(gain, now + attack);
+    g.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.start(now);
+    osc.stop(now + duration + 0.05);
+  }
+
+  function playNoise({ duration = 0.25, gain = 0.45, type = 'white' }) {
+    if (!audioCtx) return;
+    const bufferSize = audioCtx.sampleRate * duration;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      if (type === 'white') {
+        data[i] = (Math.random() * 2 - 1) * 0.9;
+      } else if (type === 'pink') {
+        // 简单粉噪
+        data[i] = ((data[i - 1] || 0) * 0.98) + (Math.random() * 0.4 - 0.2);
+      } else {
+        data[i] = (Math.random() * 2 - 1);
+      }
+    }
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const g = audioCtx.createGain();
+    g.gain.value = gain;
+    src.connect(g);
+    g.connect(masterGain);
+    src.start();
+  }
+
+  function playBubbleSound(type) {
+    ensureAudio();
+    if (!audioCtx) return;
+
+    switch (type) {
+      case BUBBLE_TYPES.NORMAL: {
+        const base = 460 + Math.random() * 80;
+        playTone({ type: 'sine', freq: base, duration: 0.13, gain: 0.28 });
+        break;
+      }
+      case BUBBLE_TYPES.GOLD: {
+        const base = 620 + Math.random() * 60;
+        playTone({ type: 'triangle', freq: base, duration: 0.11, gain: 0.30 });
+        setTimeout(() => {
+          playTone({ type: 'triangle', freq: base * 1.5, duration: 0.12, gain: 0.3 });
+        }, 70);
+        break;
+      }
+      case BUBBLE_TYPES.BOMB: {
+        playNoise({ duration: 0.23, gain: 0.45, type: 'white' });
+        playTone({ type: 'sawtooth', freq: 120, duration: 0.16, gain: 0.32, attack: 0.005 });
+        break;
+      }
+      case BUBBLE_TYPES.COMBO: {
+        const f1 = 580 + Math.random() * 60;
+        playTone({ type: 'square', freq: f1, duration: 0.09, gain: 0.3 });
+        setTimeout(() => {
+          playTone({ type: 'square', freq: f1 * 1.12, duration: 0.09, gain: 0.24 });
+        }, 60);
+        break;
+      }
+      case BUBBLE_TYPES.INVISIBLE: {
+        const f = 510 + Math.random() * 40;
+        playTone({ type: 'sine', freq: f, duration: 0.13, gain: 0.22 });
+        break;
+      }
+      case BUBBLE_TYPES.ICE: {
+        ensureAudio();
+        if (!audioCtx) break;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.connect(g);
+        g.connect(masterGain);
+        const now = audioCtx.currentTime;
+        osc.frequency.setValueAtTime(900, now);
+        osc.frequency.exponentialRampToValueAtTime(260, now + 0.28);
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.45, now + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.32);
+        break;
+      }
+    }
+  }
+
+  function playComboMilestoneSound(level) {
+    ensureAudio();
+    if (!audioCtx) return;
+    const base = 520 + level * 40;
+    const steps = [1, 1.25, 1.5, 1.75];
+    steps.forEach((mul, i) => {
+      setTimeout(() => {
+        playTone({
+          type: 'triangle',
+          freq: base * mul,
+          duration: 0.09,
+          gain: 0.32
+        });
+      }, i * 70);
+    });
+  }
+
+  function setTimerVisual() {
+    if (mode === 'infinite') {
+      timerText.textContent = '∞';
+      timerCircle.style.opacity = '0.3';
+      timerCircle.style.strokeDashoffset = '0';
+      return;
+    }
+    timerCircle.style.opacity = '1';
+    timerText.textContent = Math.max(0, Math.ceil(timeLeft)).toString();
+    const circumference = 2 * Math.PI * 18; // r=18
+    const ratio = Math.max(0, Math.min(1, timeLeft / totalTime));
+    timerCircle.setAttribute('stroke-dasharray', circumference.toFixed(1));
+    timerCircle.setAttribute('stroke-dashoffset', (circumference * (1 - ratio)).toFixed(1));
+  }
+
+  function setMode(newMode) {
+    mode = newMode;
+    if (mode === '60') {
+      totalTime = 60;
+    } else if (mode === '30') {
+      totalTime = 30;
+    } else {
+      totalTime = Infinity;
+    }
+    timeLeft = totalTime;
+    setTimerVisual();
+    [...modeButtons.querySelectorAll('.mode-btn')].forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+  }
+
+  modeButtons.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mode-btn');
+    if (!btn) return;
+    if (gameRunning) return; // 不在游戏中切换
+    setMode(btn.dataset.mode);
+  });
+
+  function randRange(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function spawnBubble() {
+    const typesPool = [
+      BUBBLE_TYPES.NORMAL,
+      BUBBLE_TYPES.NORMAL,
+      BUBBLE_TYPES.NORMAL,
+      BUBBLE_TYPES.GOLD,
+      BUBBLE_TYPES.BOMB,
+      BUBBLE_TYPES.COMBO,
+      BUBBLE_TYPES.INVISIBLE,
+      BUBBLE_TYPES.ICE
+    ];
+    let type = typesPool[Math.floor(Math.random() * typesPool.length)];
+
+    const radiusBase = {
+      [BUBBLE_TYPES.NORMAL]: 26,
+      [BUBBLE_TYPES.GOLD]: 30,
+      [BUBBLE_TYPES.BOMB]: 30,
+      [BUBBLE_TYPES.COMBO]: 26,
+      [BUBBLE_TYPES.INVISIBLE]: 24,
+      [BUBBLE_TYPES.ICE]: 28
+    }[type] || 26;
+
+    const radius = randRange(radiusBase * 0.8, radiusBase * 1.1);
+    const margin = radius + 10;
+
+    const x = randRange(margin, width - margin);
+    const y = randRange(margin + 40, height - margin);
+
+    const speed = randRange(10, 26);
+    const angle = randRange(0, TWO_PI);
+    const vx = Math.cos(angle) * speed * 0.01;
+    const vy = Math.sin(angle) * speed * 0.01;
+
+    const life = randRange(5, 12);
+
+    bubbles.push({
+      id: bubbleIdCounter++,
+      x, y, vx, vy,
+      r: radius,
+      type,
+      life,
+      age: 0
+    });
+  }
+
+  function spawnParticleBurst(x, y, color, count = 16, power = 1.0) {
+    for (let i = 0; i < count; i++) {
+      const angle = randRange(0, TWO_PI);
+      const speed = randRange(40, 130) * power;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed * 0.02,
+        vy: Math.sin(angle) * speed * 0.02,
+        life: randRange(0.4, 0.75),
+        age: 0,
+        size: randRange(2, 4),
+        color
+      });
+    }
+  }
+
+  function update(dt) {
+    const now = performance.now();
+
+    // 计时
+    if (gameRunning && mode !== 'infinite') {
+      timeLeft -= dt / 1000;
+      if (timeLeft <= 0) {
+        timeLeft = 0;
+        setTimerVisual();
+        endGame(true);
+      } else {
+        setTimerVisual();
+      }
+    }
+
+    // 生成泡泡（冰冻期间暂停）
+    if (gameRunning && now >= generationPausedUntil) {
+      spawnAccumulator += dt;
+      const actualInterval = spawnIntervalBase * (0.5 + Math.random() * 0.7);
+      while (spawnAccumulator >= actualInterval) {
+        spawnAccumulator -= actualInterval;
+        if (bubbles.length < 45) {
+          spawnBubble();
+        }
+      }
+    }
+
+    // 更新泡泡
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      const b = bubbles[i];
+      b.age += dt / 1000;
+      if (b.age >= b.life) {
+        bubbles.splice(i, 1);
+        continue;
+      }
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      const margin = b.r + 5;
+      if (b.x < margin || b.x > width - margin) {
+        b.vx *= -1;
+        b.x = Math.max(margin, Math.min(width - margin, b.x));
+      }
+      if (b.y < margin || b.y > height - margin) {
+        b.vy *= -1;
+        b.y = Math.max(margin, Math.min(height - margin, b.y));
+      }
+    }
+
+    // 更新粒子
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.age += dt / 1000;
+      if (p.age >= p.life) {
+        particles.splice(i, 1);
+        continue;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= 0.99;
+      p.vy *= 0.99;
+    }
+  }
+
+  function drawBubble(b) {
+    const { x, y, r, type } = b;
+
+    let baseColor = '#77ddff';
+    let innerColor = '#c5f5ff';
+    let highlightColor = 'rgba(255,255,255,0.9)';
+    let glow = 'rgba(120, 200, 255, 0.8)';
+    let gradientOffset = 0.4;
+    let symbol = '';
+    let symbolColor = '#ffffff';
+    let alpha = 0.96;
+
+    switch (type) {
+      case BUBBLE_TYPES.NORMAL:
+        baseColor = '#77ddff';
+        innerColor = '#dff8ff';
+        glow = 'rgba(120, 200, 255, 0.9)';
+        break;
+      case BUBBLE_TYPES.GOLD:
+        baseColor = '#ffdd77';
+        innerColor = '#fff5c4';
+        glow = 'rgba(255,230,140,0.95)';
+        symbol = '★';
+        symbolColor = '#b07100';
+        gradientOffset = 0.35;
+        break;
+      case BUBBLE_TYPES.BOMB:
+        baseColor = '#ff6a88';
+        innerColor = '#ffd1de';
+        glow = 'rgba(255,105,135,0.95)';
+        symbol = '💥';
+        symbolColor = '#3b0510';
+        gradientOffset = 0.33;
+        break;
+      case BUBBLE_TYPES.COMBO:
+        baseColor = '#95ffb5';
+        innerColor = '#e0ffe9';
+        glow = 'rgba(140,255,195,0.95)';
+        symbol = '⚡';
+        symbolColor = '#0f4b23';
+        gradientOffset = 0.38;
+        break;
+      case BUBBLE_TYPES.INVISIBLE:
+        baseColor = 'rgba(210, 230, 255, 0.3)';
+        innerColor = 'rgba(240, 250, 255, 0.1)';
+        highlightColor = 'rgba(255,255,255,0.6)';
+        glow = 'rgba(210, 230, 255, 0.45)';
+        alpha = 0.55;
+        break;
+      case BUBBLE_TYPES.ICE:
+        baseColor = '#a3e6ff';
+        innerColor = '#e9f9ff';
+        glow = 'rgba(163,230,255,0.96)';
+        symbol = '❄';
+        symbolColor = '#194a5f';
+        gradientOffset = 0.37;
+        break;
+    }
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // 外部柔和光晕
+    const outerGradient = ctx.createRadialGradient(
+      x - r * 0.3, y - r * 0.3, r * 0.1,
+      x, y, r * 1.2
+    );
+    outerGradient.addColorStop(0, glow);
+    outerGradient.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = outerGradient;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.15, 0, TWO_PI);
+    ctx.fill();
+
+    // 泡泡主体渐变
+    const grad = ctx.createRadialGradient(
+      x - r * gradientOffset, y - r * gradientOffset, r * 0.1,
+      x, y, r
+    );
+    grad.addColorStop(0, innerColor);
+    grad.addColorStop(0.4, baseColor);
+    grad.addColorStop(0.95, 'rgba(80,110,160,0.7)');
+    grad.addColorStop(1, 'rgba(20,30,60,0.0)');
+
+    ctx.beginPath();
+    ctx.fillStyle = grad;
+    ctx.arc(x, y, r, 0, TWO_PI);
+    ctx.fill();
+
+    // 边缘高光
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, r - 0.5, 0, TWO_PI);
+    ctx.stroke();
+
+    // 高光球
+    ctx.beginPath();
+    ctx.fillStyle = highlightColor;
+    const hx = x - r * 0.4;
+    const hy = y - r * 0.4;
+    ctx.ellipse(hx, hy, r * 0.36, r * 0.2, -0.5, 0, TWO_PI);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.arc(hx + r * 0.15, hy + r * 0.1, r * 0.12, 0, TWO_PI);
+    ctx.fill();
+
+    // 中心符号
+    if (symbol) {
+      ctx.fillStyle = symbolColor;
+      ctx.font = `${Math.floor(r * 0.85)}px system-ui, emoji`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(symbol, x, y);
+    }
+
+    ctx.restore();
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      const t = p.age / p.life;
+      const alpha = (1 - t) * 0.9;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * (1 - t * 0.4), 0, TWO_PI);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, width, height);
+
+    // 轻微宇宙雾气
+    const nebula = ctx.createRadialGradient(
+      width * 0.2, height * 0.3, 0,
+      width * 0.6, height, Math.max(width, height)
+    );
+    nebula.addColorStop(0, 'rgba(160,130,255,0.05)');
+    nebula.addColorStop(0.5, 'rgba(40,20,80,0.2)');
+    nebula.addColorStop(1, 'rgba(0,0,0,0.9)');
+    ctx.fillStyle = nebula;
+    ctx.fillRect(0, 0, width, height);
+
+    for (const b of bubbles) {
+      drawBubble(b);
+    }
+    drawParticles();
+  }
+
+  function gameLoop(timestamp) {
+    const dt = timestamp - lastFrame;
+    lastFrame = timestamp;
+    if (gameRunning) {
+      update(dt);
+    } else {
+      // 即使不运行游戏，也让粒子慢慢淡出
+      update(Math.min(dt, 40));
+    }
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+
+  requestAnimationFrame(gameLoop);
+
+  function resetGameState() {
+    bubbles = [];
+    particles = [];
+    score = 0;
+    combo = 0;
+    lastHitTime = 0;
+    spawnAccumulator = 0;
+    generationPausedUntil = 0;
+    scoreDisplay.textContent = '0';
+    comboDisplay.textContent = '0x';
+    hideComboBanner();
+    if (mode === '60') {
+      totalTime = 60;
+    } else if (mode === '30') {
+      totalTime = 30;
+    } else {
+      totalTime = Infinity;
+    }
+    timeLeft = totalTime;
+    setTimerVisual();
+  }
+
+  function startGame() {
+    ensureAudio(); // 首次交互初始化音频
+    resetGameState();
+    gameRunning = true;
+  }
+
+  function endGame(fromTimer = false) {
+    if (!gameRunning) return;
+    gameRunning = false;
+
+    // 只在有限模式结束时记分
+    if (mode === 'infinite' && !fromTimer) {
+      // 手动结束无限模式时也允许计入排行榜
+    }
+
+    const finalScore = score;
+    let name = window.prompt('游戏结束！请输入你的名字（可留空随机）:', '');
+    if (name === null) {
+      name = '';
+    }
+    name = name.trim();
+    if (!name) {
+      const anonNames = ['Nova', 'Stella', 'Photon', 'Quark', 'Luna', 'Orion', 'Lyra', 'Comet'];
+      name = anonNames[Math.floor(Math.random() * anonNames.length)];
+    }
+
+    const entry = { name, score: finalScore, time: Date.now() };
+    updateLeaderboard(entry);
+  }
+
+  const LS_KEY = 'bubble_pop_leaderboard_v1';
+
+  function loadLeaderboard() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveLeaderboard(list) {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(list));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function updateLeaderboard(newEntry) {
+    const list = loadLeaderboard();
+    list.push(newEntry);
+    list.sort((a, b) => b.score - a.score || a.time - b.time);
+    const top = list.slice(0, 8);
+    saveLeaderboard(top);
+    renderLeaderboard(top, newEntry);
+  }
+
+  function renderLeaderboard(list = loadLeaderboard(), highlightEntry = null) {
+    leaderboardList.innerHTML = '';
+    list.forEach((entry, idx) => {
+      const li = document.createElement('li');
+      li.className = 'leaderboard-item';
+      if (highlightEntry && highlightEntry.time === entry.time && highlightEntry.score === entry.score) {
+        li.classList.add('me');
+      }
+      const rank = document.createElement('span');
+      rank.className = 'leaderboard-rank';
+      rank.textContent = idx + 1;
+
+      const name = document.createElement('span');
+      name.className = 'leaderboard-name';
+      name.textContent = entry.name;
+
+      const score = document.createElement('span');
+      score.className = 'leaderboard-score';
+      score.textContent = entry.score;
+
+      li.appendChild(rank);
+      li.appendChild(name);
+      li.appendChild(score);
+      leaderboardList.appendChild(li);
+    });
+  }
+
+  renderLeaderboard();
+
+  function showComboBanner(comboValue) {
+    if (comboValue < 5) return;
+    comboBanner.textContent = `COMBO x${comboValue}`;
+    comboBanner.classList.remove('combo-tier-1', 'combo-tier-2', 'combo-tier-3');
+    if (comboValue >= 20) {
+      comboBanner.classList.add('combo-tier-3');
+    } else if (comboValue >= 10) {
+      comboBanner.classList.add('combo-tier-2');
+    } else {
+      comboBanner.classList.add('combo-tier-1');
+    }
+    comboBanner.classList.add('show');
+    comboBanner.style.transform = 'translate(-50%, -10px)';
+    clearTimeout(comboBanner._timer);
+    comboBanner._timer = setTimeout(() => {
+      hideComboBanner();
+    }, 750);
+  }
+
+  function hideComboBanner() {
+    comboBanner.classList.remove('show');
+    comboBanner.style.transform = 'translate(-50%, -20px)';
+  }
+
+  function addScore(base, type) {
+    let multiplier = 1;
+    if (type === BUBBLE_TYPES.GOLD) {
+      multiplier *= 3;
+    }
+    if (type === BUBBLE_TYPES.INVISIBLE) {
+      multiplier *= 2;
+    }
+    const comboMultiplier = 1 + Math.floor(combo / 5) * 0.2;
+    const added = Math.round(base * multiplier * comboMultiplier);
+    score += added;
+    if (score < 0) score = 0;
+    scoreDisplay.textContent = score;
+  }
+
+  function handleBubbleClick(mx, my) {
+    // 找到最近的泡泡
+    let hit = null;
+    let index = -1;
+    let minDist2 = Infinity;
+    for (let i = 0; i < bubbles.length; i++) {
+      const b = bubbles[i];
+      const dx = mx - b.x;
+      const dy = my - b.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= b.r * b.r && d2 < minDist2) {
+        minDist2 = d2;
+        hit = b;
+        index = i;
+      }
+    }
+    if (!hit) return;
+
+    bubbles.splice(index, 1);
+
+    const now = performance.now();
+    if (now - lastHitTime <= COMBO_WINDOW) {
+      combo += 1;
+    } else {
+      combo = 1;
+    }
+    lastHitTime = now;
+
+    if (hit.type === BUBBLE_TYPES.COMBO) {
+      combo += 3;
+    }
+    if (combo < 0) combo = 0;
+    comboDisplay.textContent = combo + 'x';
+
+    // COMBO 阈值音效
+    comboMilestones.forEach((m, i) => {
+      if (combo === m) {
+        playComboMilestoneSound(i + 1);
+      }
+    });
+
+    // 分数 & 特效
+    switch (hit.type) {
+      case BUBBLE_TYPES.NORMAL:
+        addScore(1, hit.type);
+        spawnParticleBurst(hit.x, hit.y, 'rgba(160,230,255,0.9)', 16, 1.0);
+        break;
+      case BUBBLE_TYPES.GOLD:
+        addScore(2, hit.type);
+        spawnParticleBurst(hit.x, hit.y, 'rgba(255,220,130,0.95)', 20, 1.2);
+        break;
+      case BUBBLE_TYPES.BOMB: {
+        const penalty = Math.max(3, Math.round(score * 0.15));
+        score -= penalty;
+        if (score < 0) score = 0;
+        scoreDisplay.textContent = score;
+        // 清除周围泡泡
+        const radius = hit.r * 2.2;
+        for (let i = bubbles.length - 1; i >= 0; i--) {
+          const b = bubbles[i];
+          const dx = b.x - hit.x;
+          const dy = b.y - hit.y;
+          if (dx * dx + dy * dy < radius * radius) {
+            bubbles.splice(i, 1);
+          }
+        }
+        spawnParticleBurst(hit.x, hit.y, 'rgba(255,120,140,0.95)', 30, 1.4);
+        break;
+      }
+      case BUBBLE_TYPES.COMBO:
+        addScore(1, hit.type);
+        spawnParticleBurst(hit.x, hit.y, 'rgba(140,255,195,0.95)', 22, 1.3);
+        break;
+      case BUBBLE_TYPES.INVISIBLE:
+        addScore(2, hit.type);
+        spawnParticleBurst(hit.x, hit.y, 'rgba(220,240,255,0.9)', 18, 1.0);
+        break;
+      case BUBBLE_TYPES.ICE:
+        addScore(1, hit.type);
+        generationPausedUntil = performance.now() + 3000; // 冰冻3秒
+        spawnParticleBurst(hit.x, hit.y, 'rgba(190,235,255,0.95)', 24, 1.0);
+        break;
+    }
+
+    showComboBanner(combo);
+    playBubbleSound(hit.type);
+  }
+
+  function canvasClickHandler(e) {
+    if (!gameRunning) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left);
+    const my = (e.clientY - rect.top);
+    handleBubbleClick(mx, my);
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    ensureAudio();
+    canvasClickHandler(e);
+  });
+
+  startBtn.addEventListener('click', () => {
+    startGame();
+  });
+
+  stopBtn.addEventListener('click', () => {
+    endGame(false);
+  });
+
+})();
+</script>
+</body>
+</html>
